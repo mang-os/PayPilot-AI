@@ -67,10 +67,10 @@ python -m app.seed
 uvicorn app.main:app --reload
 ```
 This runs against SQLite (`backend/dev.db`) with zero extra setup — no Postgres, no
-Razorpay keys, no OpenAI key required. Razorpay calls run in **mock mode** (realistic fake
+Razorpay keys, no Groq key required. Razorpay calls run in **mock mode** (realistic fake
 order IDs, real webhook signature verification) and the LLM orchestrator falls back to a
-**deterministic FakeLLMClient** (keyword search over the catalog) whenever `OPENAI_API_KEY`
-is unset.
+**deterministic FakeLLMClient** (keyword search over the catalog) whenever Groq is not
+fully configured (`GROQ_API_KEY` and `GROQ_AI_MODEL`).
 
 **Frontend:**
 ```bash

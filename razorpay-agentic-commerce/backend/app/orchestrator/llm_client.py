@@ -1,9 +1,9 @@
 """
 Small abstraction over "the thing that does tool-calling", so the
 orchestrator logic in merchant_agent.py doesn't care which provider is
-behind it. OpenAIClient implements the spec's "OpenAI tool calling
-compatible architecture" literally. FakeLLMClient is a deterministic
-keyword-matcher used when no OPENAI_API_KEY is set (local dev, CI, the
+behind it. GroqClient uses Groq's OpenAI-compatible tool-calling API.
+FakeLLMClient is a deterministic keyword-matcher used when Groq is not
+configured (local dev, CI, the
 demo script) - it exercises the exact same tool-dispatch code path as the
 real client, just without a network call.
 
@@ -38,15 +38,18 @@ class LLMClient(ABC):
         ...
 
 
-class OpenAIClient(LLMClient):
+class GroqClient(LLMClient):
     def __init__(self):
         from openai import OpenAI
 
-        self._client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self._client = OpenAI(
+            api_key=settings.GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1",
+        )
 
     def chat(self, messages: list[dict], tools: list[dict]) -> LLMResponse:
         response = self._client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
+            model=settings.GROQ_AI_MODEL,
             messages=messages,
             tools=tools,
         )
@@ -124,4 +127,4 @@ class FakeLLMClient(LLMClient):
 def get_llm_client() -> LLMClient:
     if settings.LLM_MOCK_MODE:
         return FakeLLMClient()
-    return OpenAIClient()
+    return GroqClient()

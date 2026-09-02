@@ -3,11 +3,16 @@ Central configuration. Everything here is overridable via environment
 variables / .env, so the same code runs against SQLite locally and
 Postgres in docker-compose without any code changes.
 """
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=PROJECT_ROOT / ".env", extra="ignore")
 
     # --- Database ---
     # Defaults to a local SQLite file so `uvicorn app.main:app` works with
@@ -34,16 +39,16 @@ class Settings(BaseSettings):
         return not (self.RAZORPAY_KEY_ID and self.RAZORPAY_KEY_SECRET)
 
     # --- LLM orchestrator ---
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    GROQ_API_KEY: str = ""
+    GROQ_AI_MODEL: str = ""
     LLM_MAX_TOOL_ITERATIONS: int = 4
-    # If no OPENAI_API_KEY is set, the orchestrator falls back to a
+    # If Groq is not fully configured, the orchestrator falls back to a
     # deterministic FakeLLMClient (keyword search over the catalog) so
     # /agent-commerce/query still works out of the box for local testing
     # and the demo script, without requiring an API key.
     @property
     def LLM_MOCK_MODE(self) -> bool:
-        return not self.OPENAI_API_KEY
+        return not (self.GROQ_API_KEY and self.GROQ_AI_MODEL)
 
     # --- Policy / risk defaults used when seeding demo agents ---
     DEFAULT_AGENT_TXN_LIMIT: float = 10000.0

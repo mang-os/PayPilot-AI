@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import app.main as main_module  # noqa: E402
 from app import timeutils  # noqa: E402
+from app.config import settings  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.agents import AgentCredential, AgentRegistry, AgentStatus  # noqa: E402
@@ -20,6 +21,14 @@ from app.services import mandate_service  # noqa: E402
 from app.services.agent_auth import hash_api_key  # noqa: E402
 
 TEST_DB_URL = "sqlite:///:memory:"
+
+
+@pytest.fixture(autouse=True)
+def isolate_external_services(monkeypatch):
+    """Keep API tests independent of configured external provider credentials."""
+    monkeypatch.setattr(settings, "GROQ_API_KEY", "")
+    monkeypatch.setattr(settings, "RAZORPAY_KEY_ID", "")
+    monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "")
 
 
 @pytest.fixture()
