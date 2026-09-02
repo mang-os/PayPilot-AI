@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background: #edeef2;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures everywhere money or counts appear - digits align like a
+   real ledger column instead of drifting with proportional widths. */
+.ledger-figure {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Visible keyboard focus, respected everywhere - not just on the elements
+   that happen to get it by default. */
+:focus-visible {
+  outline: 2px solid #b8912f;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* The signature element: a continuous vertical thread connecting audit
+   events on the Agent Trace timeline, like a ledger's stitched binding. */
+.trace-thread {
+  position: relative;
+}
+.trace-thread::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 8px;
+  bottom: 8px;
+  width: 1.5px;
+  background: linear-gradient(to bottom, #d8dbe2, #d8dbe2);
+}

@@ -1,0 +1,16 @@
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+sqlalchemy==2.0.52
+alembic==1.19.1
+pydantic==2.13.5
+pydantic-settings==2.15.0
+psycopg2-binary==2.9.12
+python-dotenv==1.2.2
+razorpay==2.0.1
+cryptography==46.0.6
+httpx==0.28.1
+openai==3.5.0
+tenacity==9.1.4
+python-multipart==0.0.32
+pytest==9.1.1
+pytest-asyncio==1.4.0

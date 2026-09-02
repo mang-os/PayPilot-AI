@@ -1,0 +1,6 @@
+__pycache__
+*.pyc
+.pytest_cache
+dev.db
+.env
+scripts/demo_agent_key.json
