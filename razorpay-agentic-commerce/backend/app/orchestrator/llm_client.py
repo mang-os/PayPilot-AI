@@ -48,11 +48,14 @@ class GroqClient(LLMClient):
         )
 
     def chat(self, messages: list[dict], tools: list[dict]) -> LLMResponse:
-        response = self._client.chat.completions.create(
-            model=settings.GROQ_AI_MODEL,
-            messages=messages,
-            tools=tools,
-        )
+        kwargs = {
+            "model": settings.GROQ_AI_MODEL,
+            "messages": messages,
+        }
+        if tools:
+            kwargs["tools"] = tools
+
+        response = self._client.chat.completions.create(**kwargs)
         choice = response.choices[0].message
         tool_calls = [
             ToolCall(id=tc.id, name=tc.function.name, arguments=json.loads(tc.function.arguments or "{}"))

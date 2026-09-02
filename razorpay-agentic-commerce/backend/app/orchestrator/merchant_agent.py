@@ -88,9 +88,18 @@ class MerchantAgent:
             # Final answer turn.
             return self._finalize(db, response.content, seen_product_ids, seen_offer_codes)
 
-        # Exceeded max iterations without a final answer - fail closed with
-        # an empty, honest result rather than guessing.
-        return AgentQueryResponse(matched_products=[], suggested_offer=None, rationale="Orchestrator exceeded max tool iterations without a final answer.")
+        # Exceeded max iterations without a final answer.
+        # Once enough merchant data has been gathered, create a dedicated final synthesis turn.
+        messages.append({
+            "role": "system",
+            "content": "Tool use is finished. Do not call any function/tool. Return ONLY the required JSON object."
+        })
+        try:
+            synth_response = self.llm_client.chat(messages, tools=[])
+            return self._finalize(db, synth_response.content, seen_product_ids, seen_offer_codes)
+        except Exception as e:
+            logger.warning(f"Final synthesis failed gracefully: {e}")
+            return AgentQueryResponse(matched_products=[], suggested_offer=None, rationale="Orchestrator exceeded max tool iterations and failed to synthesize a final answer.")
 
     def _finalize(self, db: Session, content: str | None, seen_product_ids: set[str], seen_offer_codes: set[str]) -> AgentQueryResponse:
         product_ids: list[str] = []

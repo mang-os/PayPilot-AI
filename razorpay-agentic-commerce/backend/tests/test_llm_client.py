@@ -36,3 +36,26 @@ def test_groq_client_uses_compatible_endpoint_and_preserves_tool_calls(monkeypat
     assert captured["request_kwargs"]["model"] == "test-groq-model"
     assert response.content is None
     assert response.tool_calls == [ToolCall(id="call_1", name="search_products", arguments={"query": "earbuds"})]
+
+def test_groq_client_omits_tools_when_empty(monkeypatch):
+    captured: dict = {}
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured["client_kwargs"] = kwargs
+            self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
+
+        def create(self, **kwargs):
+            captured["request_kwargs"] = kwargs
+            message = SimpleNamespace(content='{"product_ids": []}', tool_calls=None)
+            return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+    monkeypatch.setattr(settings, "GROQ_API_KEY", "test-groq-key")
+    monkeypatch.setattr(settings, "GROQ_AI_MODEL", "test-groq-model")
+
+    response = GroqClient().chat(messages=[{"role": "user", "content": "earbuds"}], tools=[])
+
+    assert "tools" not in captured["request_kwargs"]
+    assert response.content == '{"product_ids": []}'
+    assert response.tool_calls == []
