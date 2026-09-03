@@ -26,8 +26,7 @@ class MockLLMClient(LLMClient):
         return LLMResponse(content="{}")
 
 def test_merchant_agent_multiple_tool_rounds_and_synthesis(db_session, catalog):
-    # Prove that multiple tool rounds work (search_products followed by get_available_offers)
-    # and synthesis gets no tools if it exhausts iterations.
+    # Prove that multiple tool rounds work (search_products -> check_inventory -> get_available_offers) and final synthesis has no tools.
     responses = [
         LLMResponse(
             content=None,
@@ -35,27 +34,32 @@ def test_merchant_agent_multiple_tool_rounds_and_synthesis(db_session, catalog):
         ),
         LLMResponse(
             content=None,
-            tool_calls=[ToolCall(id="call_2", name="get_available_offers", arguments={})]
+            tool_calls=[ToolCall(id="call_2", name="check_inventory", arguments={"product_id": catalog["product_id"]})]
         ),
-        # On turn 3, say the LLM naturally stops calling tools and provides a final answer.
+        LLMResponse(
+            content=None,
+            tool_calls=[ToolCall(id="call_3", name="get_available_offers", arguments={})]
+        ),
+        # Final synthesis turn – no tools.
         LLMResponse(
             content=json.dumps({"product_ids": [catalog["product_id"]], "suggested_offer_code": catalog["offer_code"], "rationale": "Found it"})
-        )
+        ),
     ]
     mock_llm = MockLLMClient(responses)
     agent = MerchantAgent(llm_client=mock_llm)
-    
+
     result = agent.handle_query(db_session, "find test")
-    
+
     assert len(result.matched_products) == 1
     assert result.suggested_offer is not None
-    assert mock_llm.turn == 3
-    # Turn 1: has tools
+    assert mock_llm.turn == 4
+    # Verify call history length and tool usage.
+    assert len(mock_llm.call_history) == 4
     assert len(mock_llm.call_history[0]["tools"]) > 0
-    # Turn 2: still has tools
     assert len(mock_llm.call_history[1]["tools"]) > 0
-    # Turn 3: still has tools since it was a natural exit before max iterations
     assert len(mock_llm.call_history[2]["tools"]) > 0
+    assert len(mock_llm.call_history[3]["tools"]) == 0
+    assert mock_llm.call_history[3]["messages"][-1]["content"].startswith("Tool use is finished.")
 
 
 def test_merchant_agent_discards_hallucinated_product(db_session, catalog):
@@ -64,9 +68,9 @@ def test_merchant_agent_discards_hallucinated_product(db_session, catalog):
             content=None,
             tool_calls=[ToolCall(id="call_1", name="search_products", arguments={"query": "test"})]
         ),
-        # LLM tries to smuggle a fake product ID along with a real one
+        # LLM tries to smuggle a fake product ID and a fake offer code along with a real one
         LLMResponse(
-            content=json.dumps({"product_ids": [catalog["product_id"], "fake_id_123"], "rationale": "Trust me"})
+            content=json.dumps({"product_ids": [catalog["product_id"], "fake_id_123"], "suggested_offer_code": "FAKE_OFFER", "rationale": "Trust me"})
         )
     ]
     mock_llm = MockLLMClient(responses)
@@ -76,7 +80,7 @@ def test_merchant_agent_discards_hallucinated_product(db_session, catalog):
     
     assert len(result.matched_products) == 1
     assert result.matched_products[0].id == catalog["product_id"]
-
+    assert result.suggested_offer is None
 
 def test_merchant_agent_exhausts_iterations_and_does_synthesis(db_session, monkeypatch, catalog):
     # Prove that the loop remains bounded.

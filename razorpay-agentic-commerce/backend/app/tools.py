@@ -69,7 +69,7 @@ TOOL_SCHEMAS = [
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Free-text search, e.g. 'wireless earbuds'"},
-                    "max_price": {"type": "number", "description": "Optional upper price bound"},
+                    "max_price": {"type": ["number", "null"], "description": "Optional upper price bound"},
                 },
                 "required": ["query"],
             },

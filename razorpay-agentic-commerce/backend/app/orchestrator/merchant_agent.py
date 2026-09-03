@@ -52,30 +52,50 @@ class MerchantAgent:
         seen_product_ids: set[str] = set()
         seen_offer_codes: set[str] = set()
 
+        got_search = False
+        got_inventory = False
+        got_offers = False
+
         for _ in range(settings.LLM_MAX_TOOL_ITERATIONS):
+            # Phase A: always present full tool schema list.
             response = self.llm_client.chat(messages, tools=TOOL_SCHEMAS)
 
             if response.tool_calls:
-                # OpenAI-format: the assistant turn that requested tool
-                # calls must itself be added to the transcript.
+                # Record assistant turn that requested tools.
                 messages.append({
                     "role": "assistant",
                     "content": response.content,
                     "tool_calls": [
-                        {"id": tc.id, "type": "function", "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)}}
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)}
+                        }
                         for tc in response.tool_calls
                     ],
                 })
+
                 for call in response.tool_calls:
                     try:
                         result = dispatch_tool(db, call.name, call.arguments)
                     except KeyError:
                         result = {"error": f"unknown tool {call.name}"}
 
-                    if call.name == "search_products" and isinstance(result, list):
-                        seen_product_ids.update(p["id"] for p in result)
-                    if call.name == "get_available_offers" and isinstance(result, list):
-                        seen_offer_codes.update(o["code"] for o in result)
+                    # Update success flags based on result shape.
+                    if call.name == "search_products" and isinstance(result, list) and result:
+                        if all(isinstance(p, dict) and "id" in p for p in result):
+                            got_search = True
+                            seen_product_ids.update(p["id"] for p in result)
+                    if (
+                        call.name == "check_inventory"
+                        and isinstance(result, dict)
+                        and result.get("product_id")
+                    ):
+                        got_inventory = True
+                    if call.name == "get_available_offers" and isinstance(result, list) and result:
+                        if all(isinstance(o, dict) and "code" in o for o in result):
+                            got_offers = True
+                            seen_offer_codes.update(o["code"] for o in result)
 
                     messages.append({
                         "role": "tool",
@@ -83,23 +103,49 @@ class MerchantAgent:
                         "name": call.name,
                         "content": json.dumps(result),
                     })
+
+                # If all required data gathered, move to Phase B synthesis.
+                if got_search and got_inventory and got_offers:
+                    return self._synthesize_without_tools(
+                        db, messages, seen_product_ids, seen_offer_codes
+                    )
                 continue
 
-            # Final answer turn.
+            # No tool calls – treat as final answer (Phase B).
             return self._finalize(db, response.content, seen_product_ids, seen_offer_codes)
 
-        # Exceeded max iterations without a final answer.
-        # Once enough merchant data has been gathered, create a dedicated final synthesis turn.
+        # Exceeded max iterations without a final answer; delegate to Phase B.
+        return self._synthesize_without_tools(
+            db, messages, seen_product_ids, seen_offer_codes
+        )
+
+    def _synthesize_without_tools(
+        self,
+        db: Session,
+        messages: list,
+        seen_product_ids: set[str],
+        seen_offer_codes: set[str],
+    ) -> AgentQueryResponse:
+        """Phase B: perform a final synthesis call with tools=[] so Groq cannot reject it."""
         messages.append({
             "role": "system",
-            "content": "Tool use is finished. Do not call any function/tool. Return ONLY the required JSON object."
+            "content": "Tool use is finished. Do not call any function/tool. Return ONLY the required JSON object.",
         })
         try:
             synth_response = self.llm_client.chat(messages, tools=[])
-            return self._finalize(db, synth_response.content, seen_product_ids, seen_offer_codes)
+            return self._finalize(
+                db,
+                synth_response.content,
+                seen_product_ids,
+                seen_offer_codes,
+            )
         except Exception as e:
             logger.warning(f"Final synthesis failed gracefully: {e}")
-            return AgentQueryResponse(matched_products=[], suggested_offer=None, rationale="Orchestrator exceeded max tool iterations and failed to synthesize a final answer.")
+            return AgentQueryResponse(
+                matched_products=[],
+                suggested_offer=None,
+                rationale="Orchestrator exceeded max tool iterations and failed to synthesize a final answer.",
+            )
 
     def _finalize(self, db: Session, content: str | None, seen_product_ids: set[str], seen_offer_codes: set[str]) -> AgentQueryResponse:
         product_ids: list[str] = []
