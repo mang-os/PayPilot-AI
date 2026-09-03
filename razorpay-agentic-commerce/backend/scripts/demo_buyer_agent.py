@@ -52,7 +52,7 @@ def sign_webhook_body(body: bytes) -> str:
     return hmac.new(settings.RAZORPAY_WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
 
 
-def run_golden_path(client: httpx.Client, identity: dict) -> None:
+def run_golden_path(client: httpx.Client, identity: dict, real_payment: bool = False) -> None:
     headers = auth_headers(identity["api_key"])
 
     banner("STEP 1: Discover products via the Merchant Agent (LLM orchestrator)")
@@ -120,6 +120,12 @@ def run_golden_path(client: httpx.Client, identity: dict) -> None:
     print(json.dumps(completed, indent=2))
     razorpay_order_id = completed["razorpay_order_id"]
 
+    # Print key checkout details regardless of mode
+    print(f"\n=> Checkout ID: {checkout_id}\n=> Razorpay Order ID: {razorpay_order_id}\n=> Razorpay Key ID: {settings.RAZORPAY_KEY_ID}\n=> Final Amount: {completed['final_amount']} {completed['currency']}")
+    if real_payment:
+        print("\n[INFO] Real payment mode enabled. Waiting for a real Razorpay Test Mode payment/webhook...")
+        return
+    
     banner("STEP 6: Simulate the Razorpay webhook (payment.captured)")
     print("(In a live demo with real test-mode keys, this event would come from")
     print(" Razorpay itself after completing payment via Razorpay Checkout with a")
@@ -241,6 +247,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--scenario", choices=["golden_path", "invalid_product", "duplicate_checkout", "razorpay_timeout"], default="golden_path")
     parser.add_argument("--base-url", default=BASE_URL)
+    parser.add_argument("--real-payment", action='store_true', help='When set, run golden_path without simulated webhook and wait for a real Razorpay Test Mode payment')
     args = parser.parse_args()
 
     BASE_URL = args.base_url
@@ -248,7 +255,7 @@ def main():
     identity = load_agent_identity()
     with httpx.Client(timeout=15.0) as client:
         if args.scenario == "golden_path":
-            run_golden_path(client, identity)
+            run_golden_path(client, identity, real_payment=args.real_payment)
         elif args.scenario == "invalid_product":
             run_invalid_product_scenario(client, identity)
         elif args.scenario == "duplicate_checkout":
