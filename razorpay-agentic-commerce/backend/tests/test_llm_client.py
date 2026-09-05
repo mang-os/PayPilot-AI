@@ -8,6 +8,7 @@ from app.orchestrator.llm_client import GroqClient, ToolCall
 
 def test_groq_client_uses_compatible_endpoint_and_preserves_tool_calls(monkeypatch):
     captured: dict = {}
+    tools = [{"type": "function", "function": {"name": "search_products"}}]
 
     class FakeOpenAI:
         def __init__(self, **kwargs):
@@ -27,17 +28,21 @@ def test_groq_client_uses_compatible_endpoint_and_preserves_tool_calls(monkeypat
     monkeypatch.setattr(settings, "GROQ_API_KEY", "test-groq-key")
     monkeypatch.setattr(settings, "GROQ_AI_MODEL", "test-groq-model")
 
-    response = GroqClient().chat(messages=[{"role": "user", "content": "earbuds"}], tools=[])
+    response = GroqClient().chat(messages=[{"role": "user", "content": "earbuds"}], tools=tools)
 
     assert captured["client_kwargs"] == {
         "api_key": "test-groq-key",
         "base_url": "https://api.groq.com/openai/v1",
     }
     assert captured["request_kwargs"]["model"] == "test-groq-model"
+    assert captured["request_kwargs"]["tools"] == tools
+    assert "response_format" not in captured["request_kwargs"]
+    assert "tool_choice" not in captured["request_kwargs"]
     assert response.content is None
     assert response.tool_calls == [ToolCall(id="call_1", name="search_products", arguments={"query": "earbuds"})]
 
-def test_groq_client_omits_tools_when_empty(monkeypatch):
+
+def test_groq_client_json_synthesis_omits_all_tool_controls(monkeypatch):
     captured: dict = {}
 
     class FakeOpenAI:
@@ -54,8 +59,13 @@ def test_groq_client_omits_tools_when_empty(monkeypatch):
     monkeypatch.setattr(settings, "GROQ_API_KEY", "test-groq-key")
     monkeypatch.setattr(settings, "GROQ_AI_MODEL", "test-groq-model")
 
-    response = GroqClient().chat(messages=[{"role": "user", "content": "earbuds"}], tools=[])
+    response = GroqClient().chat(
+        messages=[{"role": "user", "content": "Return JSON."}],
+        response_format={"type": "json_object"},
+    )
 
     assert "tools" not in captured["request_kwargs"]
+    assert "tool_choice" not in captured["request_kwargs"]
+    assert captured["request_kwargs"]["response_format"] == {"type": "json_object"}
     assert response.content == '{"product_ids": []}'
     assert response.tool_calls == []

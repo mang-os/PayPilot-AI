@@ -53,3 +53,29 @@ class CheckoutCompleteResponse(CheckoutResponse):
         "only mark the order COMPLETED once it receives and verifies the "
         "razorpay webhook - a client-reported 'success' is never trusted."
     )
+
+
+class DashboardMandateSummary(BaseModel):
+    mandate_id: str
+    max_amount: float
+    currency: str
+    expires_at: datetime
+    status: str
+
+
+class DashboardCheckoutDetailResponse(BaseModel):
+    checkout_id: str
+    agent_id: str
+    status: str
+    items: list[CheckoutItemOut]
+    offer_code: str | None
+    subtotal: float | None
+    discount_amount: float | None
+    tax_amount: float | None
+    final_amount: float | None
+    currency: str
+    razorpay_order_id: str | None
+    failure_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+    mandate: DashboardMandateSummary | None

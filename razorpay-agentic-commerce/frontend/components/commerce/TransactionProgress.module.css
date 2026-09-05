@@ -1,0 +1,24 @@
+.progress { margin-block: 24px; padding: 20px 0; border-block: 1px solid rgb(var(--color-border)); }
+.heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 24px; margin-bottom: 20px; }
+.heading > span { color: rgb(var(--color-hi)); font-size: 14px; font-weight: 600; }
+.heading p { color: rgb(var(--color-ai)); font-size: 14px; line-height: 1.5; }
+.heading p[data-state="failed"] { color: rgb(var(--color-err)); }
+.heading p[data-state="completed"] { color: rgb(var(--color-ok)); }
+.heading p[data-state="upcoming"] { color: rgb(var(--color-lo)); }
+.rail { position: relative; display: flex; overflow-x: auto; padding: 8px 0 12px; scrollbar-width: thin; scroll-snap-type: x proximity; }
+.stage { position: relative; flex: 1 0 92px; display: flex; align-items: center; flex-direction: column; min-width: 0; scroll-snap-align: center; }
+.stage:not(:last-child)::after { content: ""; position: absolute; left: calc(50% + 19px); top: 17px; width: calc(100% - 38px); height: 2px; background: rgb(var(--color-border)); }
+.stage[data-state="completed"]:not(:last-child)::after { background: rgb(var(--color-ok)); }
+.node { position: relative; z-index: 1; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid rgb(var(--color-border)); border-radius: 50%; color: rgb(var(--color-lo)); background: rgb(var(--color-base)); font-size: 14px; font-weight: 600; }
+.label { margin-top: 9px; color: rgb(var(--color-lo)); font-size: 14px; font-weight: 500; }
+.state { margin-top: 2px; color: rgb(var(--color-lo)); font-size: 12px; }
+.stage[data-state="completed"] .node { border-color: rgb(var(--color-ok)); color: white; background: rgb(var(--color-ok)); }
+.stage[data-state="completed"] .label { color: rgb(var(--color-hi)); }
+.stage[data-state="active"] .node { background: rgb(var(--color-ai)); border-color: rgb(var(--color-ai)); color: white; box-shadow: 0 0 0 5px rgb(var(--color-ai) / .1); }
+.stage[data-state="active"] .node::before { content: ""; position: absolute; inset: -7px; border: 1px solid rgb(var(--color-ai) / .4); border-radius: 50%; animation: active 2.2s ease-in-out infinite; }
+.stage[data-state="active"] .label, .stage[data-state="active"] .state { color: rgb(var(--color-ai)); font-weight: 600; }
+.stage[data-state="failed"] .node { background: rgb(var(--color-err)); border-color: rgb(var(--color-err)); color: white; box-shadow: 0 0 0 5px rgb(var(--color-err) / .08); }
+.stage[data-state="failed"] .label, .stage[data-state="failed"] .state { color: rgb(var(--color-err)); }
+@keyframes active { 50% { opacity: .2; transform: scale(.95); } }
+@media (max-width: 600px) { .heading { display: block; } .heading p { margin-top: 5px; } .progress { margin-block: 20px; } }
+@media (prefers-reduced-motion: reduce) { .stage[data-state="active"] .node::before { animation: none; } }

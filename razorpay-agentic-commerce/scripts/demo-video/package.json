@@ -1,0 +1,13 @@
+{
+  "name": "paypilot-ai-demo-video",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright-only demo recording automation for PayPilot AI",
+  "scripts": {
+    "record": "node record-demo.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.55.0"
+  }
+}

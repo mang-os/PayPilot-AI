@@ -31,6 +31,16 @@ payable price, invent a discount, promise a specific inventory count you
 did not get from check_inventory, or mention any product that did not come
 from search_products.
 
+Follow this tool plan without repeating completed work:
+1. Call search_products exactly once, carrying over the user's search terms
+   and price ceiling. Do not broaden the request or search again.
+2. If products were returned, call check_inventory for the products you may
+   recommend. You may issue multiple inventory calls in one turn.
+3. Call get_available_offers exactly once when products were returned.
+If search_products returned no products, stop calling tools. Once the
+required results are present, stop calling tools so a separate synthesis
+step can produce the final answer.
+
 When you have enough information, respond with ONLY a JSON object (no
 markdown, no prose) of the form:
 {"product_ids": ["..."], "suggested_offer_code": "..." or null, "rationale": "..."}
@@ -38,6 +48,11 @@ markdown, no prose) of the form:
 This response is advisory only - the merchant's Checkout Engine will
 independently re-price everything from the database, so do not attempt to
 compute totals."""
+
+FINAL_SYNTHESIS_PROMPT = """You are the final response synthesizer. Tool execution is complete and no tools are available.
+Use only the query and real tool results in the JSON evidence supplied by the user. Return ONLY one JSON object with this exact shape:
+{"product_ids": ["..."], "suggested_offer_code": "..." or null, "rationale": "..."}
+Include only product IDs present in search_products results and only an offer code present in get_available_offers results. If no product matched, return an empty product_ids list. Do not emit a tool call, markdown, or prose outside the JSON object."""
 
 
 class MerchantAgent:
@@ -82,7 +97,7 @@ class MerchantAgent:
                         result = {"error": f"unknown tool {call.name}"}
 
                     # Update success flags based on result shape.
-                    if call.name == "search_products" and isinstance(result, list) and result:
+                    if call.name == "search_products" and isinstance(result, list):
                         if all(isinstance(p, dict) and "id" in p for p in result):
                             got_search = True
                             seen_product_ids.update(p["id"] for p in result)
@@ -92,7 +107,7 @@ class MerchantAgent:
                         and result.get("product_id")
                     ):
                         got_inventory = True
-                    if call.name == "get_available_offers" and isinstance(result, list) and result:
+                    if call.name == "get_available_offers" and isinstance(result, list):
                         if all(isinstance(o, dict) and "code" in o for o in result):
                             got_offers = True
                             seen_offer_codes.update(o["code"] for o in result)
@@ -105,14 +120,21 @@ class MerchantAgent:
                     })
 
                 # If all required data gathered, move to Phase B synthesis.
-                if got_search and got_inventory and got_offers:
+                if got_search and (
+                    not seen_product_ids or (got_inventory and got_offers)
+                ):
                     return self._synthesize_without_tools(
                         db, messages, seen_product_ids, seen_offer_codes
                     )
                 continue
 
-            # No tool calls – treat as final answer (Phase B).
-            return self._finalize(db, response.content, seen_product_ids, seen_offer_codes)
+            # A tools-enabled turn never doubles as the final answer. Preserve
+            # any content it produced, then make the dedicated JSON-only call.
+            if response.content:
+                messages.append({"role": "assistant", "content": response.content})
+            return self._synthesize_without_tools(
+                db, messages, seen_product_ids, seen_offer_codes
+            )
 
         # Exceeded max iterations without a final answer; delegate to Phase B.
         return self._synthesize_without_tools(
@@ -126,13 +148,36 @@ class MerchantAgent:
         seen_product_ids: set[str],
         seen_offer_codes: set[str],
     ) -> AgentQueryResponse:
-        """Phase B: perform a final synthesis call with tools=[] so Groq cannot reject it."""
-        messages.append({
-            "role": "system",
-            "content": "Tool use is finished. Do not call any function/tool. Return ONLY the required JSON object.",
-        })
+        """Phase B: synthesize from plain evidence with no tool controls at all."""
+        query = next(
+            (message.get("content", "") for message in messages if message.get("role") == "user"),
+            "",
+        )
+        tool_results = []
+        for message in messages:
+            if message.get("role") != "tool":
+                continue
+            try:
+                result = json.loads(message.get("content") or "null")
+            except (json.JSONDecodeError, TypeError):
+                result = message.get("content")
+            tool_results.append({
+                "name": message.get("name"),
+                "result": result,
+            })
+
+        synthesis_messages = [
+            {"role": "system", "content": FINAL_SYNTHESIS_PROMPT},
+            {
+                "role": "user",
+                "content": json.dumps({"query": query, "tool_results": tool_results}),
+            },
+        ]
         try:
-            synth_response = self.llm_client.chat(messages, tools=[])
+            synth_response = self.llm_client.chat(
+                synthesis_messages,
+                response_format={"type": "json_object"},
+            )
             return self._finalize(
                 db,
                 synth_response.content,

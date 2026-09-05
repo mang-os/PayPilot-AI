@@ -1,0 +1,21 @@
+AI agents can discover products and make purchase decisions, but giving an AI unrestricted control over money creates a serious trust problem.
+
+PayPilot AI enables agent-to-agent commerce while keeping financial execution under deterministic control.
+
+The buyer provides a single intent: find and buy two ANC earbuds under six thousand rupees.
+
+The buyer agent communicates with the merchant system, discovers eligible products, evaluates the constraints, selects the best candidate, applies the available offer, and automatically constructs the cart.
+
+But the agent cannot directly move money.
+
+Before payment, PayPilot validates merchant policy, delegated spending authority, and inventory.
+
+Only after every financial control passes is Razorpay invoked. Payment verification and webhook evidence are stored in the transaction audit trail.
+
+Now the agent is given a spending authority of five thousand rupees.
+
+The requested transaction exceeds that authority, so the deterministic mandate rejects the purchase.
+
+Inventory is not reserved, Razorpay is never invoked, payment is never attempted, and zero rupees move.
+
+PayPilot AI enables autonomous commerce without giving autonomous AI unrestricted financial authority.

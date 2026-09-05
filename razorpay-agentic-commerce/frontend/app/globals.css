@@ -2,39 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-base: 248 250 252;
+  --color-s1: 255 255 255;
+  --color-s2: 245 247 250;
+  --color-border: 220 226 234;
+  --color-hi: 15 23 42;
+  --color-lo: 91 102 121;
+  --color-ok: 8 116 67;
+  --color-ai: 79 70 229;
+  --color-pay: 37 99 235;
+  --color-err: 180 35 24;
+}
+
+.execution-panel {
+  --color-base: 9 11 16;
+  --color-s1: 16 19 26;
+  --color-s2: 23 27 36;
+  --color-border: 41 47 59;
+  --color-hi: 242 245 250;
+  --color-lo: 152 162 179;
+  --color-ok: 85 197 150;
+  --color-ai: 167 139 250;
+  --color-pay: 77 140 255;
+  --color-err: 241 113 113;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
 html,
 body {
-  background: #edeef2;
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 body {
   -webkit-font-smoothing: antialiased;
+  background-image: radial-gradient(circle at 18% -12%, rgba(79, 70, 229, 0.055), transparent 30rem);
 }
 
-/* Tabular figures everywhere money or counts appear - digits align like a
-   real ledger column instead of drifting with proportional widths. */
+/* ── Tabular figures for money / counts ───────────────────────────────────── */
 .ledger-figure {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
 
-/* Visible keyboard focus, respected everywhere - not just on the elements
-   that happen to get it by default. */
+/* ── Keyboard focus ───────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid #b8912f;
+  outline: 2px solid #4f46e5;
   outline-offset: 2px;
 }
 
+/* ── Reduced-motion ──────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
 }
 
-/* The signature element: a continuous vertical thread connecting audit
-   events on the Agent Trace timeline, like a ledger's stitched binding. */
+/* ── Audit timeline thread ───────────────────────────────────────────────── */
 .trace-thread {
   position: relative;
 }
@@ -44,6 +73,179 @@ body {
   left: 15px;
   top: 8px;
   bottom: 8px;
-  width: 1.5px;
-  background: linear-gradient(to bottom, #d8dbe2, #d8dbe2);
+  width: 1px;
+  background: #dce2ea;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ── Storefront visual language ─────────────────────────────────────────── */
+.surface-noise {
+  background-image: linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.product-visual::before {
+  content: "";
+  position: absolute;
+  inset: 12% 18%;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 38% 62% 52% 48%;
+  transform: rotate(-12deg);
+}
+
+.journey-rail-object {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.journey-product-token {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0.3;
+}
+
+.journey-product-token.is-settled {
+  animation: journeyTokenSettle 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.journey-product-token-1.is-settled { animation-delay: 100ms; }
+.journey-product-token-2.is-settled { animation-delay: 200ms; }
+
+@keyframes journeyTokenSettle {
+  from { opacity: 0; transform: translateY(-160px) scale(0.82); }
+  72% { opacity: 1; transform: translateY(4px) scale(1.03); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.journey-cart-machine,
+.journey-package-machine,
+.journey-package-cargo,
+.journey-package-reveal,
+.journey-package-flap,
+.journey-package-seal,
+.journey-wheel {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.journey-cart-machine {
+  opacity: 1;
+  transition: opacity 280ms ease, transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.journey-package-machine {
+  opacity: 0;
+  transform: scale(0.72) translateY(7px);
+  transition: opacity 300ms ease, transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.journey-rail-object.is-secured .journey-cart-machine {
+  opacity: 0;
+  transform: scale(0.82) translateY(4px);
+}
+
+.journey-rail-object.is-secured .journey-wheel {
+  opacity: 0;
+  transform: translateY(-5px) scale(0.55);
+  transition: opacity 200ms ease, transform 340ms ease;
+}
+
+.journey-rail-object.is-secured .journey-package-machine {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.journey-package-cargo {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.7);
+  transition: opacity 220ms ease, transform 440ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.journey-rail-object.is-secured .journey-package-cargo {
+  opacity: 0.86;
+  transform: translateY(0) scale(1);
+  transition-delay: 130ms;
+}
+
+.journey-rail-object.is-completed .journey-package-cargo {
+  opacity: 0;
+  transform: translateY(6px) scale(0.85);
+}
+
+.journey-package-reveal {
+  opacity: 0;
+  transform: translateY(12px) scale(0.8);
+  transition: opacity 280ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.journey-rail-object.is-unlocked .journey-package-seal {
+  opacity: 0;
+  transform: scale(0.42) rotate(18deg);
+  transition: opacity 180ms ease, transform 320ms ease;
+}
+
+.journey-rail-object.is-unlocked .journey-package-seam {
+  stroke: #A9C8FF;
+  stroke-width: 1.65;
+  transition: stroke 180ms ease, stroke-width 180ms ease;
+}
+
+.journey-rail-object.is-completed .journey-package-flap-left {
+  transform: rotate(-22deg) translate(-5px, -7px);
+}
+
+.journey-rail-object.is-completed .journey-package-flap-right {
+  transform: rotate(22deg) translate(5px, -7px);
+}
+
+.journey-rail-object.is-completed .journey-package-flap {
+  transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.journey-rail-object.is-completed .journey-package-reveal {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-delay: 170ms;
+}
+
+.journey-razor-wedge,
+.journey-razor-edge {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.journey-razorpay-gate.is-verified .journey-razor-wedge,
+.journey-razorpay-gate.is-verified .journey-razor-edge {
+  animation: journeyRazorSweep 390ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.journey-razorpay-gate.is-verified .journey-razor-edge { animation-delay: 45ms; }
+
+@keyframes journeyRazorSweep {
+  from { opacity: 0; transform: translate(-17px, 17px) scaleX(0.35); }
+  35% { opacity: 1; }
+  to { opacity: 0.92; transform: translate(0, 0) scaleX(1); }
+}
+
+.journey-breath { animation: journeyBreath 2.8s ease-in-out infinite; }
+@keyframes journeyBreath {
+  0%, 100% { opacity: 0.24; transform: scale(0.9); }
+  50% { opacity: 0.9; transform: scale(1.08); }
 }

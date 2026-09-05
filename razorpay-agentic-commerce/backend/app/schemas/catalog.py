@@ -36,3 +36,24 @@ class OfferOut(BaseModel):
     valid_from: datetime
     valid_until: datetime | None
     is_active: bool
+
+
+class StorefrontInventoryOut(BaseModel):
+    quantity_available: int
+    reserved_quantity: int
+
+
+class StorefrontProductOut(BaseModel):
+    id: str
+    sku: str
+    name: str
+    description: str
+    category: str
+    price: float
+    image_url: str
+    inventory: StorefrontInventoryOut | None
+
+
+class StorefrontCatalogResponse(BaseModel):
+    products: list[StorefrontProductOut]
+    offers: list[OfferOut]

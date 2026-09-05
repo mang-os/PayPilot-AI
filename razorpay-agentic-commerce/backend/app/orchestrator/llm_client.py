@@ -34,7 +34,12 @@ class LLMResponse:
 
 class LLMClient(ABC):
     @abstractmethod
-    def chat(self, messages: list[dict], tools: list[dict]) -> LLMResponse:
+    def chat(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+        response_format: dict | None = None,
+    ) -> LLMResponse:
         ...
 
 
@@ -47,13 +52,20 @@ class GroqClient(LLMClient):
             base_url="https://api.groq.com/openai/v1",
         )
 
-    def chat(self, messages: list[dict], tools: list[dict]) -> LLMResponse:
+    def chat(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+        response_format: dict | None = None,
+    ) -> LLMResponse:
         kwargs = {
             "model": settings.GROQ_AI_MODEL,
             "messages": messages,
         }
         if tools:
             kwargs["tools"] = tools
+        if response_format:
+            kwargs["response_format"] = response_format
 
         response = self._client.chat.completions.create(**kwargs)
         choice = response.choices[0].message
@@ -73,7 +85,12 @@ class FakeLLMClient(LLMClient):
     a final answer built only from what the tools returned.
     """
 
-    def chat(self, messages: list[dict], tools: list[dict]) -> LLMResponse:
+    def chat(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+        response_format: dict | None = None,
+    ) -> LLMResponse:
         has_tool_results = any(m.get("role") == "tool" for m in messages)
 
         if not has_tool_results:

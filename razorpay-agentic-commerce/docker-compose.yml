@@ -35,6 +35,10 @@ services:
     build: ./frontend
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
+      AGENT_COMMERCE_API_URL: http://backend:8000
+      AGENT_COMMERCE_API_KEY: ${AGENT_COMMERCE_API_KEY}
+      AGENT_COMMERCE_AGENT_ID: ${AGENT_COMMERCE_AGENT_ID}
+      AGENT_COMMERCE_PRIVATE_KEY_HEX: ${AGENT_COMMERCE_PRIVATE_KEY_HEX}
     depends_on:
       - backend
     ports:

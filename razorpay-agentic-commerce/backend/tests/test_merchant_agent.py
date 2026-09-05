@@ -12,13 +12,17 @@ class MockLLMClient(LLMClient):
         self.call_history = []
         self.turn = 0
         
-    def chat(self, messages, tools):
-        self.call_history.append({"messages": list(messages), "tools": list(tools)})
+    def chat(self, messages, tools=None, response_format=None):
+        self.call_history.append({
+            "messages": list(messages),
+            "tools": None if tools is None else list(tools),
+            "response_format": response_format,
+        })
         if self.turn < len(self.responses):
             resp = self.responses[self.turn]
             
-            # Simulate Groq 400 error if tools=[] but the mocked response tries to call a tool anyway
-            if not tools and resp.tool_calls:
+            # Simulate Groq rejecting a tool call during tool-free synthesis.
+            if tools is None and resp.tool_calls:
                 raise Exception("Tool choice is none, but model called a tool")
                 
             self.turn += 1
@@ -58,8 +62,16 @@ def test_merchant_agent_multiple_tool_rounds_and_synthesis(db_session, catalog):
     assert len(mock_llm.call_history[0]["tools"]) > 0
     assert len(mock_llm.call_history[1]["tools"]) > 0
     assert len(mock_llm.call_history[2]["tools"]) > 0
-    assert len(mock_llm.call_history[3]["tools"]) == 0
-    assert mock_llm.call_history[3]["messages"][-1]["content"].startswith("Tool use is finished.")
+    assert mock_llm.call_history[3]["tools"] is None
+    assert mock_llm.call_history[3]["response_format"] == {"type": "json_object"}
+    synthesis_messages = mock_llm.call_history[3]["messages"]
+    assert all(message.get("role") != "tool" for message in synthesis_messages)
+    evidence = json.loads(synthesis_messages[-1]["content"])
+    assert [result["name"] for result in evidence["tool_results"]] == [
+        "search_products",
+        "check_inventory",
+        "get_available_offers",
+    ]
 
 
 def test_merchant_agent_discards_hallucinated_product(db_session, catalog):
@@ -69,6 +81,9 @@ def test_merchant_agent_discards_hallucinated_product(db_session, catalog):
             tool_calls=[ToolCall(id="call_1", name="search_products", arguments={"query": "test"})]
         ),
         # LLM tries to smuggle a fake product ID and a fake offer code along with a real one
+        LLMResponse(
+            content=json.dumps({"product_ids": [catalog["product_id"], "fake_id_123"], "suggested_offer_code": "FAKE_OFFER", "rationale": "Trust me"})
+        ),
         LLMResponse(
             content=json.dumps({"product_ids": [catalog["product_id"], "fake_id_123"], "suggested_offer_code": "FAKE_OFFER", "rationale": "Trust me"})
         )
@@ -96,7 +111,7 @@ def test_merchant_agent_exhausts_iterations_and_does_synthesis(db_session, monke
             content=None,
             tool_calls=[ToolCall(id="call_2", name="get_available_offers", arguments={})]
         ),
-        # Now iterations are exhausted (2). It will force a final synthesis turn with tools=[]
+        # Now iterations are exhausted (2). It will force a final synthesis turn with no tool controls.
         LLMResponse(
             content=json.dumps({"product_ids": [catalog["product_id"]], "suggested_offer_code": None, "rationale": "Forced synthesis"})
         )
@@ -112,8 +127,36 @@ def test_merchant_agent_exhausts_iterations_and_does_synthesis(db_session, monke
     assert len(mock_llm.call_history[0]["tools"]) > 0
     assert len(mock_llm.call_history[1]["tools"]) > 0
     # Turn 3 (forced synthesis) had NO tools
-    assert len(mock_llm.call_history[2]["tools"]) == 0
-    assert mock_llm.call_history[2]["messages"][-1]["content"].startswith("Tool use is finished.")
+    assert mock_llm.call_history[2]["tools"] is None
+    assert mock_llm.call_history[2]["response_format"] == {"type": "json_object"}
+    assert all(message.get("role") != "tool" for message in mock_llm.call_history[2]["messages"])
+
+
+def test_merchant_agent_cleanly_synthesizes_empty_search_results(db_session):
+    responses = [
+        LLMResponse(
+            content=None,
+            tool_calls=[ToolCall(id="call_1", name="search_products", arguments={"query": "impossible-product-xyz"})],
+        ),
+        LLMResponse(
+            content=json.dumps({
+                "product_ids": [],
+                "suggested_offer_code": None,
+                "rationale": "No catalog product matched the request.",
+            })
+        ),
+    ]
+    mock_llm = MockLLMClient(responses)
+
+    result = MerchantAgent(llm_client=mock_llm).handle_query(db_session, "impossible-product-xyz")
+
+    assert result.matched_products == []
+    assert result.suggested_offer is None
+    assert result.rationale == "No catalog product matched the request."
+    assert mock_llm.call_history[-1]["tools"] is None
+    assert mock_llm.call_history[-1]["response_format"] == {"type": "json_object"}
+    evidence = json.loads(mock_llm.call_history[-1]["messages"][-1]["content"])
+    assert evidence["tool_results"] == [{"name": "search_products", "result": []}]
 
 
 def test_merchant_agent_gracefully_handles_synthesis_tool_failure(db_session, monkeypatch):
